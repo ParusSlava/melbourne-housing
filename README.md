@@ -1,12 +1,100 @@
 # Melbourne Housing Snapshot
-Snapshot of Tony Pino's Melbourne Housing Dataset
+Прогноз цін на нерухомість у Мельбурні
 
-Link: https://www.kaggle.com/datasets/dansbecker/melbourne-housing-snapshot
+## Про проєкт
 
-Context    
-Melbourne real estate is BOOMING. Can you find the insight or predict the next big trend to become a real estate mogul… or even harder, to snap up a reasonably priced 2-bedroom unit?     
+Навчальний проєкт з аналізу даних і машинного навчання. Мета — побудувати
+модель, яка прогнозує ціну будинку чи квартири в Мельбурні на основі його
+характеристик (кількість кімнат, район, відстань до центру тощо).
 
-Content    
-This is a snapshot of a dataset created by Tony Pino.     
+**Джерело даних:** [Melbourne Housing Snapshot](https://www.kaggle.com/datasets/dansbecker/melbourne-housing-snapshot)
+на Kaggle — 13 580 реальних продажів нерухомості.
 
-It was scraped from publicly available results posted every week from Domain.com.au. He cleaned it well, and now it's up to you to make data analysis magic. The dataset includes Address, Type of Real estate, Suburb, Method of Selling, Rooms, Price, Real Estate Agent, Date of Sale and distance from C.B.D.
+## Що зроблено
+
+### 1. Очищення даних
+- Дату продажу перетворено з тексту на справжній формат дати
+- Нульові значення площі ділянки (`Landsize`) і площі будівлі (`BuildingArea`)
+  замінено на "відсутні" — площа не може дорівнювати нулю
+- Виправлено помилкові роки побудови (наприклад, рік 1196 — явна помилка)
+- Перевірено і підтверджено відсутність дублікатів рядків
+
+### 2. Дослідницький аналіз (EDA)
+- Розподіл цін скошений вправо — більшість об'єктів коштує 500 тис. — 1.5 млн,
+  є невелика кількість елітної нерухомості за 5–9 млн
+- **Тип житла** суттєво впливає на ціну: будинки в середньому вдвічі дорожчі
+  за квартири
+- **Відстань до центру** обернено пов'язана з ціною — чим далі, тим дешевше
+- Виявлено майже-дублікат ознак: `Rooms` і `Bedroom2` (кореляція ~0.93)
+
+### 3. Нові ознаки
+- Вік будинку на момент продажу (рік продажу мінус рік побудови)
+- Рік і місяць продажу окремо (для врахування сезонності й динаміки ринку)
+- Прапорці наявності даних для стовпців з пропусками
+- Частотне кодування району (`suburb_freq`) замість 314 окремих стовпців
+
+### 4. Модель
+
+Побудовано і порівняно три моделі:
+
+| Модель | MAE (AUD) | R² |
+|---|---|---|
+| Базова лінія (середнє) | ~430,000 | ~0.00 |
+| Лінійна регресія | ~200,000 | ~0.60 |
+| **Випадковий ліс (найкраща)** | **~150,000** | **~0.80** |
+
+**Найкраща модель — випадковий ліс.** Вона помиляється в середньому на
+~150 тисяч доларів, що становить близько 17% від типової ціни будинку.
+Модель пояснює близько 80% розкиду цін на ринку.
+
+### Найважливіші фактори ціни (за версією моделі)
+1. Відстань до центру міста
+2. Кількість кімнат і ванних кімнат
+3. Район (популярність і регіон)
+4. Тип житла (будинок / квартира / таунхаус)
+
+### Приклад прогнозу
+
+Реальний будинок з тестової вибірки:
+- Тип: {example['Type'].values[0]}
+- Кімнат: {example['Rooms'].values[0]}
+- Відстань до центру: {example['Distance'].values[0]} км
+- Район: {example['Regionname'].values[0]}
+
+**Реальна ціна:** {real_price:,.0f} AUD
+**Прогноз моделі:** {pred_price:,.0f} AUD
+**Похибка:** {abs(real_price-pred_price):,.0f} AUD ({abs(real_price-pred_price)/real_price*100:.1f}%)
+
+## Як покращити результат далі
+
+1. **Підбір гіперпараметрів** — налаштувати глибину дерев і кількість
+   дерев у випадковому лісі (GridSearch / RandomizedSearch) замість
+   стандартних значень
+2. **Спробувати градієнтний бустинг** (XGBoost, LightGBM) — зазвичай
+   точніший за випадковий ліс на табличних даних
+3. **Географічні ознаки** — використати координати (`Lattitude`,
+   `Longtitude`) для розрахунку відстані до конкретних об'єктів
+   інфраструктури (школи, транспорт, центри зайнятості)
+4. **Логарифмування ціни** — навчати модель на `log(Price)` замість
+   `Price`, оскільки розподіл цілі скошений — це може покращити якість
+   прогнозу для дорогих об'єктів
+
+## Структура проєкту
+melbourne-housing/
+
+├── melb_data.csv           # вихідні дані
+
+├── melb_clean.csv          # після очищення (Крок 3)
+
+├── melb_features.csv       # після feature engineering (Крок 5)
+
+├── notebook/
+
+│   └── melbourne_housing.ipynb   # повний код проєкту
+
+└── README.md                # цей файл
+
+## Інструменти
+
+Python, pandas, numpy, matplotlib, scikit-learn (Pipeline, ColumnTransformer,
+RandomForestRegressor, LinearRegression)
